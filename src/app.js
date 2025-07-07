@@ -1,7 +1,9 @@
 const express = require('express');
 const app=express();
-app.get("/user",(req,rep)=>
+app.get("/user/:userid",(req,rep)=>
 {
+    console.log(JSON.stringify(req.params));
+
   rep.send("FirstName : Arpon , LastName : Roy");
 });
 app.post("/user",(req,rep)=>
