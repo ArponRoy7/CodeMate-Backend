@@ -1,10 +1,14 @@
 const express = require('express');
 const app=express();
-const {adminAuth} = require('./middleware/auth');
-app.get("/admin",adminAuth)
-app.get('/admin/all',(req,res)=>
+app.use("/user",(req,rep)=>
 {
-    res.send("Welcome to Admin Dashboard");
+    throw new Error("User Not Found");//express know about error
+    rep.send("Hello User");
+})
+app.use("/",(err,req,rep,next)=>
+{
+    if(err)
+    rep.status(500).send("not found");
 })
 
 app.listen(3000,()=>
