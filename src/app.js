@@ -1,14 +1,22 @@
 const express = require('express');
 const app=express();
-app.use("/hello",(req,reply)=>
+app.get("/user",(req,rep)=>
 {
-reply.send("Hello")
+  rep.send("FirstName : Arpon , LastName : Roy");
 });
-app.use("/bye",(req,reply)=>
+app.post("/user",(req,rep)=>
+{
+    rep.send("User Details Saved");
+});
+app.use("/Test",(req,reply)=>
+{
+reply.send("Testing Route Handler")
+});
+app.use("/",(req,reply)=>
     {
-    reply.send("bye")
+    reply.send("nothing")
     });
 app.listen(3000,()=>
 {
-    console.log("Server  hi Rssunning");
+    console.log("Server  Running");
 })
