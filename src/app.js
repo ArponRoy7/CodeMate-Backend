@@ -74,12 +74,12 @@ app.post("/login",async(req,res)=>
     {
       throw new Error("Invalid Cred");
     }
-    const ispasswordvalid = await bcrypt.compare(password, user.password);
+    const ispasswordvalid = await validatePassword(password);
 
     if(ispasswordvalid)
     {
 //create token
-const token = await jwt.sign({_id:user._id},"arpon123",{expiresIn:"1d"});
+const token  = await user.getJWT();
 res.cookie("token",token);
 console.log(token);
       res.send("Log in successfull");
