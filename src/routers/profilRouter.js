@@ -1,7 +1,9 @@
 const express = require('express');
 const profileRouter= express.Router();
+const bcrypt = require('bcrypt');
 const User = require('/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/model/user.js');
 const {adminAuth} = require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/middleware/auth.js")
+const {updatevalid}=require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/utils/validations.js");
 
 //profile view api
 profileRouter.get("/profile/view",adminAuth,async (req,res)=>
@@ -16,33 +18,36 @@ profileRouter.get("/profile/view",adminAuth,async (req,res)=>
 }
 )
 
-//updating
-profileRouter.patch("/profile/update", async (req, res) => {
-  const userid = req.body._id;
-  const data = req.body;
+///profile/edit
+profileRouter.patch("/profile/update",adminAuth, async (req, res) => {
   try {
-    const ALLOWED_UPDATES=[
-      "age","email"
-    ];
-    const is_allow=Object.keys(data).every((k)=>
-      ALLOWED_UPDATES.includes(k)
-  );
-  if(!is_allow)
-  {
-    throw new Error("Update Not allow");
-  }
-    const updatedUser = await User.findByIdAndUpdate(userid, data, {
-      new: true,
-      runValidators: true,
-    });
-    if (!updatedUser) {
-      return res.status(404).send("User not found");
+    if(!updatevalid(req))
+    {
+      throw new Error ("Edit not allowed");
     }
-    res.send("User Updated Successfully");
+    const loginuser = req.loginuser;
+  Object.keys(req.body).forEach((key)=>(loginuser[key]=req.body[key]));
+  console.log(loginuser);
+  res.send("Edit was successful");
+    await loginuser.save();
   } catch (error) {
-    console.error(error);
-    res.status(400).send("Something Went Wrong");
+    console.log("Error :" + error);
   }
-});
-
+})
+//forget password
+profileRouter.patch("/profile/password",adminAuth,async(req,res)=>
+{
+  try {
+    const loginuser = req.loginuser;
+    const isPasswordValid = await loginuser.validatePassword(req.body.oldpassword);
+    if(!isPasswordValid)
+      throw new Error("Password Not valid");
+    const newpassword = await bcrypt.hash(req.body.newpassword, 10);
+    req.loginuser.password=newpassword;
+    await loginuser.save();
+    res.send("Password Updated Sucessfully");
+  } catch (error) {
+    console.log("Error :" + error);
+  }
+})
 module.exports=profileRouter;

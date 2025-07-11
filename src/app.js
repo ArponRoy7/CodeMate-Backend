@@ -6,7 +6,7 @@ const profileRouters = require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node
 const cookieparser = require("cookie-parser");
 const jwt = require('jsonwebtoken');
 const authRouters=require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/routers/authRouter.js"); 
-const requestRouter=require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/routers/profilRouter.js");
+const requestRouter=require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/routers/requestRouter.js");
 app.use(express.json());
 app.use(cookieparser());
 app.use("/",authRouters);

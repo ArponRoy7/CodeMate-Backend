@@ -46,14 +46,15 @@ authRouters.post("/login",async(req,res)=>
         {
           throw new Error("Invalid Cred");
         }
-        const ispasswordvalid = await validatePassword(password);
+        const isPasswordValid = await user.validatePassword(password);
+
     
-        if(ispasswordvalid)
+        if(isPasswordValid)
         {
     //create token
     const token  = await user.getJWT();
     res.cookie("token",token);
-    console.log(token);
+    //console.log(token);
           res.send("Log in successfull");
         }
         else
@@ -61,9 +62,16 @@ authRouters.post("/login",async(req,res)=>
       }
       catch(err)
       {
-        res.status(404).send("Error");
+        res.status(404).send("Error"+err.message);
       }
     })
-    
+// log out api
+authRouters.get("/logout",async (req,res)=>
+{
+  res.cookie("token",null,{
+    expires: new Date(Date.now())
+  });
+  res.send("Log out Sucessfull");
+})
 
 module.exports = authRouters;
