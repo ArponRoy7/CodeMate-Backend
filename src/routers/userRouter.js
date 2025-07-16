@@ -1,5 +1,6 @@
 const express = require("express");
 const userRouter = express.Router();
+const User = require('/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/model/user.js');
 
 const {adminAuth} = require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/middleware/auth.js")
 const ConnectionRequest = require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/model/connectionRequest.js");
@@ -49,5 +50,51 @@ userRouter.get("/user/connections", adminAuth, async (req, res) => {
     res.status(400).send({ message: err.message });
   }
 });
+//feed api
+userRouter.get("/feed", adminAuth, async (req, res) => {
+  try {
+    const loggedInUser = req.loginuser;
+
+    // Pagination logic
+    const page = parseInt(req.query.page) || 1;
+    let limit = parseInt(req.query.limit) || 10;
+    limit = limit > 50 ? 50 : limit;
+    const skip = (page - 1) * limit;
+
+    // Get all accepted connection requests of the user
+    const connectionRequests = await ConnectionRequest.find({
+      $or: [
+        { fromUserId: loggedInUser._id },
+        { toUserId: loggedInUser._id }
+      ]
+    }).select("fromUserId toUserId");
+
+    // Build a set of user IDs to hide from the feed (connected users)
+    const hideUsersFromFeed = new Set();
+    connectionRequests.forEach((req) => {
+      if (req.fromUserId.toString() === loggedInUser._id.toString()) {
+        hideUsersFromFeed.add(req.toUserId.toString());
+      } else {
+        hideUsersFromFeed.add(req.fromUserId.toString());
+      }
+    });
+
+    // Find users not in the connection list and not the current user
+    const users = await User.find({
+      $and: [
+        { _id: { $nin: Array.from(hideUsersFromFeed) } },
+        { _id: { $ne: loggedInUser._id } }
+      ]
+    })
+      .select(USER_SAFE_DATA)
+      .skip(skip)
+      .limit(limit);
+
+    res.send(users);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 
 module.exports = userRouter;
