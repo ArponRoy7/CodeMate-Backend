@@ -5,7 +5,7 @@ const User = require('/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season
 const ConnectionRequest=require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/model/connectionRequest.js");
 const {adminAuth} = require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/middleware/auth.js");
 //profile view
-profileRouter.get("/request",adminAuth,async(req,res)=>
+requestRouter.get("/request",adminAuth,async(req,res)=>
     {
       try {
         
@@ -15,7 +15,7 @@ profileRouter.get("/request",adminAuth,async(req,res)=>
        }
     })
 //deleteing
-profileRouter.delete("/user/del",async(req,rep)=>
+requestRouter.delete("/user/del",async(req,rep)=>
   {
     try {
       const userid=req.body._id;
@@ -26,7 +26,8 @@ profileRouter.delete("/user/del",async(req,rep)=>
       res.status(404).send("error happed");
     }
   })
-  profileRouter.post("/request/send/:status/:userId", adminAuth, async (req, res) => {
+  //request
+  requestRouter.post("/request/send/:status/:userId", adminAuth, async (req, res) => {
     try {
       const fromUserId = req.loginuser._id;
       const toUserId = req.params.userId;
@@ -80,5 +81,44 @@ profileRouter.delete("/user/del",async(req,rep)=>
       res.status(500).send("Error: " + error.message);
     }
   });
+  //changing status
+  requestRouter.post(
+    "/request/review/:status/:requestId",
+    adminAuth,
+    async (req, res) => {
+      try {
+        const loggedInUser = req.loginuser;
+        const { status, requestId } = req.params;
   
-module.exports=profileRouter;
+        const allowedStatus = ["accepted", "rejected"];
+        if (!allowedStatus.includes(status)) {
+          return res.status(400).json({ message: "Status not allowed!" });
+        }
+  
+        const connectionRequest = await ConnectionRequest.findOne({
+          _id: requestId,
+          toUserId: loggedInUser._id,
+          status: "interested",
+        });
+  
+        if (!connectionRequest) {
+          return res
+            .status(404)
+            .json({ message: "Connection request not found" });
+        }
+  
+        // Update and save the status
+        connectionRequest.status = status;
+        await connectionRequest.save();
+  
+        res.json({
+          message: `Connection request ${status} successfully.`,
+          data: connectionRequest,
+        });
+      } catch (error) {
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+      }
+    }
+  );
+  
+module.exports=requestRouter;

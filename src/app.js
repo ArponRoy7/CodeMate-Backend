@@ -7,12 +7,13 @@ const cookieparser = require("cookie-parser");
 const jwt = require('jsonwebtoken');
 const authRouters=require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/routers/authRouter.js"); 
 const requestRouter=require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/routers/requestRouter.js");
+const userRouter = require('./routers/userRouter');
 app.use(express.json());
 app.use(cookieparser());
 app.use("/",authRouters);
 app.use("/",profileRouters);
 app.use("/",requestRouter);
-
+app.use("/",userRouter);
 
 
 connectDB()

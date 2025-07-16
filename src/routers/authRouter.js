@@ -9,7 +9,8 @@ authRouters.post("/signup", async (req, res) => {
       //validator
       validatesignupdata(req); // custom validator
       //encrypt the password
-      const { name, email, password } = req.body;
+      const { name, email, password, skills, about, photourl, age, gender } = req.body;
+
   const passwordhash = await bcrypt.hash(password, 10);
   console.log(passwordhash); // Print hashed password
   
@@ -17,6 +18,11 @@ authRouters.post("/signup", async (req, res) => {
     name,
     email,
     password: passwordhash, // Store hashed password
+    skills,
+    about,
+    photourl,
+    age,
+    gender
   });
   
   

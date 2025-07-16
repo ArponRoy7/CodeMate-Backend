@@ -37,7 +37,15 @@ const schema = new mongoose.Schema({
   photourl: {
     type: String,
     default: "default value"
-  }
+  },
+about: {
+  type: String,
+  default: "This is a default about of the user"
+},
+skills: {
+  type: [String],
+  default: []
+}
 }, {
   timestamps: true
 });
