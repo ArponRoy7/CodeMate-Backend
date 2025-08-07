@@ -1,9 +1,9 @@
 const express = require('express');
-const profileRouter= express.Router();
+const profileRouter = express.Router();
 const bcrypt = require('bcrypt');
-const User = require('/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/model/user.js');
-const {adminAuth} = require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/middleware/auth.js")
-const {updatevalid}=require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/utils/validations.js");
+const User = require('../model/user.js');
+const { adminAuth } = require('../middleware/auth.js');
+const { updatevalid } = require('../utils/validations.js');
 
 //profile view api
 profileRouter.get("/profile/view",adminAuth,async (req,res)=>

@@ -1,13 +1,21 @@
 const express = require('express');
 const app = express();
 const { connectDB } = require('./config/database');
-const {adminAuth} = require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/middleware/auth.js")
-const profileRouters = require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/routers/profilRouter.js");
+const { adminAuth } = require('./middleware/auth.js');
+const profileRouters = require('./routers/profilRouter.js');
 const cookieparser = require("cookie-parser");
 const jwt = require('jsonwebtoken');
-const authRouters=require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/routers/authRouter.js"); 
-const requestRouter=require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/routers/requestRouter.js");
+const authRouters = require('./routers/authRouter.js'); 
+const requestRouter = require('./routers/requestRouter.js');
 const userRouter = require('./routers/userRouter');
+const cors = require("cors");
+
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(cookieparser());
 app.use("/",authRouters);

@@ -1,6 +1,6 @@
 const express = require('express');
 const findRouter = express.Router();
-const User = require('/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/model/user.js');
+const User = require('../model/user.js');
 
 //finding by filter 
 findRouter.get("/user",async(req , res)=>
@@ -25,7 +25,7 @@ findRouter.get("/feed",async(req,res)=>
         res.status(201).send(entry);
       } catch (error) {
         console.log(err);
-        res.status(404).send("error happed");
+        res.status(404).send("error happend");
       }
     })
     

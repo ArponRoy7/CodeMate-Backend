@@ -1,8 +1,8 @@
 const express = require('express');
-const authRouters=express.Router();
+const authRouters = express.Router();
 const bcrypt = require('bcrypt');
-const User = require('/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/model/user.js');
-const {validatesignupdata}=require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/utils/validations.js");
+const User = require('../model/user.js');
+const { validatesignupdata } = require('../utils/validations.js');
 //signup
 authRouters.post("/signup", async (req, res) => {
     try {
@@ -12,7 +12,7 @@ authRouters.post("/signup", async (req, res) => {
       const { name, email, password, skills, about, photourl, age, gender } = req.body;
 
   const passwordhash = await bcrypt.hash(password, 10);
-  console.log(passwordhash); // Print hashed password
+  
   
   const user = new User({
     name,
@@ -53,13 +53,17 @@ authRouters.post("/login",async(req,res)=>
           throw new Error("Invalid Cred");
         }
         const isPasswordValid = await user.validatePassword(password);
-
-    
         if(isPasswordValid)
         {
     //create token
     const token  = await user.getJWT();
-    res.cookie("token",token);
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: "Lax",
+      secure: false,
+      path: "/"
+    });
+    
     //console.log(token);
           res.send("Log in successfull");
         }
@@ -72,12 +76,15 @@ authRouters.post("/login",async(req,res)=>
       }
     })
 // log out api
-authRouters.get("/logout",async (req,res)=>
-{
-  res.cookie("token",null,{
-    expires: new Date(Date.now())
+authRouters.get("/logout", async (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    sameSite: "Lax",    
+    secure: false,      
+    path: "/"
   });
-  res.send("Log out Sucessfull");
-})
+  res.status(200).send("Logout successful");
+});
+
 
 module.exports = authRouters;

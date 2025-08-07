@@ -1,9 +1,9 @@
 const express = require("express");
 const userRouter = express.Router();
-const User = require('/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/model/user.js');
+const User = require('../model/user.js');
 
-const {adminAuth} = require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/middleware/auth.js")
-const ConnectionRequest = require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/model/connectionRequest.js");
+const { adminAuth } = require('../middleware/auth.js');
+const ConnectionRequest = require('../model/connectionRequest.js');
 
 // Get all the pending connection requests for the logged-in user
 userRouter.get("/user/requests/received", adminAuth, async (req, res) => {

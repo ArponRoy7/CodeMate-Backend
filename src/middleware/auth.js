@@ -1,12 +1,13 @@
-const User = require("/home/arpon-roy/Desktop/WebDevCodes/Namaste Node JS/Season_2/DevTinderBackend/src/model/user.js");
-const jwt = require('jsonwebtoken');
+const User = require("../model/user.js");
+const jwt = require("jsonwebtoken");
+
 
 const adminAuth = async (req, res, next) => { 
     try {
     const cookie=req.cookies;
     const {token}=cookie;
     if(!token)
-      {throw new Error("Invalid token try to log in  ");
+      {return res.status(401).send("Please Log in");
       }
     //validate token 
     const decoded =await jwt.verify(token,"arpon123");
