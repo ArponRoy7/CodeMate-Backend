@@ -55,21 +55,25 @@ userRouter.get("/feed", adminAuth, async (req, res) => {
   try {
     const loggedInUser = req.loginuser;
 
-    // Pagination logic
+    // Pagination
     const page = parseInt(req.query.page) || 1;
     let limit = parseInt(req.query.limit) || 10;
     limit = limit > 50 ? 50 : limit;
     const skip = (page - 1) * limit;
 
-    // Get all accepted connection requests of the user
+    // Filters (search by name or skill)
+    const search = req.query.search || "";
+    const sortBy = req.query.sortBy || "name"; // can be name, age
+    const sortOrder = req.query.sortOrder === "desc" ? -1 : 1;
+
+    // Step 1: Get all connected users to exclude from feed
     const connectionRequests = await ConnectionRequest.find({
       $or: [
         { fromUserId: loggedInUser._id },
-        { toUserId: loggedInUser._id }
+        { toUserId: loggedInUser._id },
       ]
     }).select("fromUserId toUserId");
 
-    // Build a set of user IDs to hide from the feed (connected users)
     const hideUsersFromFeed = new Set();
     connectionRequests.forEach((req) => {
       if (req.fromUserId.toString() === loggedInUser._id.toString()) {
@@ -79,22 +83,40 @@ userRouter.get("/feed", adminAuth, async (req, res) => {
       }
     });
 
-    // Find users not in the connection list and not the current user
-    const users = await User.find({
-      $and: [
-        { _id: { $nin: Array.from(hideUsersFromFeed) } },
-        { _id: { $ne: loggedInUser._id } }
+    // Step 2: Build the query
+    const query = {
+      _id: { 
+        $nin: Array.from(hideUsersFromFeed),
+        $ne: loggedInUser._id 
+      },
+      $or: [
+        { name: { $regex: search, $options: "i" } },
+        { skills: { $elemMatch: { $regex: search, $options: "i" } } }
       ]
-    })
+    };
+
+    // Step 3: Execute paginated, sorted query
+    const users = await User.find(query)
       .select(USER_SAFE_DATA)
+      .sort({ [sortBy]: sortOrder })
       .skip(skip)
       .limit(limit);
 
-    res.send(users);
+    // Step 4: Total count for frontend
+    const totalCount = await User.countDocuments(query);
+
+    res.status(200).json({
+      currentPage: page,
+      totalUsers: totalCount,
+      pageSize: users.length,
+      users,
+    });
+
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(500).json({ message: "Feed fetch failed", error: err.message });
   }
 });
+
 
 
 module.exports = userRouter;

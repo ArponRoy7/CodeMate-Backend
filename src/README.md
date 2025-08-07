@@ -83,7 +83,7 @@ DevTinderBackend/
 |              | POST   | `/request/review/:status/:requestId` | Accept/Reject request         |
 | **user**     | GET    | `/user/requests/received`            | View incoming requests        |
 |              | GET    | `/user/connections`                  | View accepted connections     |
-|              | GET    | `/feed?page=x&limit=y`               | Paginated user discovery feed |
+|              | GET    | `/feed?page=x&limit=y&search=keyword`| Paginated user discovery feed |
 
 ---
 
