@@ -1,12 +1,12 @@
 const express = require('express');
 const app = express();
-const { connectDB } = require('./config/database');
+const { connectDB } = require('./config/database.js');
 const profileRouters = require('./routers/profilRouter.js');
 const cookieparser = require("cookie-parser");
 const authRouters = require('./routers/authRouter.js'); 
 const requestRouter = require('./routers/requestRouter.js');
-const userRouter = require('./routers/userRouter');
-const limiter = require('./middleware/rateLimiter');
+const userRouter = require('./routers/userRouter.js');
+const limiter = require('./middleware/rateLimiter.js');
 const cors = require("cors");
 
 app.use(

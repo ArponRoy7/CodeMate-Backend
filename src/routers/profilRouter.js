@@ -19,21 +19,33 @@ profileRouter.get("/profile/view",adminAuth,async (req,res)=>
 )
 
 ///profile/edit
-profileRouter.patch("/profile/update",adminAuth, async (req, res) => {
+profileRouter.patch("/profile/update", adminAuth, async (req, res) => {
   try {
-    if(!updatevalid(req))
-    {
-      throw new Error ("Edit not allowed");
+    if (!updatevalid(req)) {
+      return res.status(400).json({ message: "Edit not allowed. Invalid fields in request." });
     }
+
     const loginuser = req.loginuser;
-  Object.keys(req.body).forEach((key)=>(loginuser[key]=req.body[key]));
-  console.log(loginuser);
-  res.send("Edit was successful");
+    const updates = {};
+
+    Object.keys(req.body).forEach((key) => {
+      loginuser[key] = req.body[key];
+      updates[key] = req.body[key];
+    });
+
     await loginuser.save();
+
+    res.status(200).json({
+      message: "Edit was successful",
+      updatedFields: updates
+    });
+
   } catch (error) {
-    console.log("Error :" + error);
+    console.error("Error:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
-})
+});
+
 //forget password
 profileRouter.patch("/profile/password",adminAuth,async(req,res)=>
 {

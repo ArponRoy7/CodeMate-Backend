@@ -10,12 +10,14 @@ const validatesignupdata=(req)=>
     else if(!validator.isStrongPassword(password))
         throw new Error("Enter correct pass");
 }
-const updatevalid=(req)=>
-{
-  const allowed = ["name","email"];
-  const isallow=Object.keys(req.body).every((field)=>allowed.includes(field));
-  return isallow;
-}
+const updatevalid = (req) => {
+    const disallowedFields = ['password', 'name', 'email'];
+    const isAllowed = Object.keys(req.body).every(
+      (field) => !disallowedFields.includes(field)
+    );
+    return isAllowed;
+  };
+  
 module.exports={
     validatesignupdata,
     updatevalid
