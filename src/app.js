@@ -1,13 +1,12 @@
 const express = require('express');
 const app = express();
 const { connectDB } = require('./config/database');
-const { adminAuth } = require('./middleware/auth.js');
 const profileRouters = require('./routers/profilRouter.js');
 const cookieparser = require("cookie-parser");
-const jwt = require('jsonwebtoken');
 const authRouters = require('./routers/authRouter.js'); 
 const requestRouter = require('./routers/requestRouter.js');
 const userRouter = require('./routers/userRouter');
+const limiter = require('./middleware/rateLimiter');
 const cors = require("cors");
 
 app.use(
@@ -18,6 +17,7 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieparser());
+app.use(limiter);
 app.use("/",authRouters);
 app.use("/",profileRouters);
 app.use("/",requestRouter);
