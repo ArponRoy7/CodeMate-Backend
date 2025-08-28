@@ -11,12 +11,12 @@ const validatesignupdata=(req)=>
         throw new Error("Enter correct pass");
 }
 const updatevalid = (req) => {
-    const disallowedFields = ['password', 'name', 'email'];
-    const isAllowed = Object.keys(req.body).every(
-      (field) => !disallowedFields.includes(field)
-    );
-    return isAllowed;
+    const allowed = ["name", "photoUrl", "photourl", "age", "gender", "about", "skills"];
+    const keys = Object.keys(req.body || {});
+    if (keys.length === 0) return false;
+    return keys.every((k) => allowed.includes(k));
   };
+  
   
 module.exports={
     validatesignupdata,

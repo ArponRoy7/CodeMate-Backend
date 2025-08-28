@@ -3,19 +3,15 @@ const validator = require('validator');
 const jwt = require("jsonwebtoken");
 const bcrypt = require('bcrypt');
 const schema = new mongoose.Schema({
-  name: { 
-    type: String,
-    required: true,
-    index : true,
-    unique: true
-  },
+  name: { type: String, required: true, index: true } ,
+
   age: { 
     type: Number 
   },
   gender: { 
     type: String,
     validate(value) {
-      if (!["male", "female", "others"].includes(value)) {
+      if (!["male", "female", "other"].includes(value)) {
         throw new Error("Gender is wrong");
       }
     }

@@ -1,11 +1,13 @@
-const rateLimit = require('express-rate-limit');
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per 15 minutes
-    message: "Too many requests from this IP, please try again later.",
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
+// middleware/rateLimiter.js
+const rateLimit = require("express-rate-limit");
 
-  module.exports = limiter;
-  
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many requests from this IP, please try again later.",
+  skip: (req) => req.method === "OPTIONS",   // <— don’t throttle preflights
+});
+
+module.exports = limiter;
