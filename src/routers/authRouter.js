@@ -5,11 +5,41 @@ const User = require('../model/user.js');
 const { validatesignupdata } = require('../utils/validations.js');
 
 // signup
+// authRouter.js
+
+// SIGNUP (creates user, sets session cookie, returns safe snapshot)
 authRouters.post("/signup", async (req, res) => {
   try {
+    // Basic validation (name/email/password required; others optional)
     validatesignupdata(req);
-    const { name, email, password, skills, about, photourl, age, gender } = req.body;
 
+    let {
+      name,
+      email,
+      password,
+      skills = [],
+      about = "",
+      photourl = "",
+      age,
+      gender, // "male" | "female" | "other"
+    } = req.body || {};
+
+    // Normalize
+    if (typeof skills === "string") {
+      // accept comma-separated
+      skills = skills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+    if (age !== undefined && age !== null && age !== "") {
+      const n = Number(age);
+      if (!Number.isNaN(n)) age = n;
+      else delete req.body.age; // ignore bad age
+    }
+    if (typeof gender === "string") gender = gender.toLowerCase().trim();
+
+    // Hash password & create
     const passwordhash = await bcrypt.hash(password, 10);
     const user = new User({
       name,
@@ -17,29 +47,48 @@ authRouters.post("/signup", async (req, res) => {
       password: passwordhash,
       skills,
       about,
-      photourl,  // <- DB field appears to be 'photourl'
+      photourl, // schema field
       age,
-      gender
+      gender,
     });
 
     await user.save();
 
-    // optional: return the created user (safe subset)
+    // Issue session cookie
+    const token = await user.getJWT();
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false, // set true if serving over HTTPS
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+    });
+
+    // Return a safe snapshot the frontend can put in Redux
     return res.status(201).json({
       _id: user._id,
       name: user.name,
       email: user.email,
-      photoUrl: user.photourl || user.photoUrl || null,
-      message: "User created successfully"
+      photoUrl: user.photourl || null,
+      age: user.age ?? null,
+      gender: user.gender ?? null,
+      about: user.about ?? "",
+      skills: user.skills ?? [],
+      message: "User created successfully",
     });
   } catch (err) {
-    console.error(err.message);
-    if (err.name === "ValidationError" || err.message?.includes("valid")) {
+    console.error("Signup error:", err);
+    if (err?.code === 11000) {
+      return res.status(400).send("Email or name already exists.");
+    }
+    if (err.name === "ValidationError" || (err.message && /valid/i.test(err.message))) {
       return res.status(400).send(err.message);
     }
     return res.status(500).send("Error creating user");
   }
 });
+
+
+
 
 // login
 authRouters.post("/login", async (req, res) => {
