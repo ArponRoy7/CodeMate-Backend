@@ -10,7 +10,7 @@ const adminAuth = async (req, res, next) => {
       {return res.status(401).send("Please Log in");
       }
     //validate token 
-    const decoded =await jwt.verify(token,"arpon123");
+    const decoded =await jwt.verify(token,process.env.TOKEN);
     const {_id}=decoded;
     const loginuser = await User.findById(_id);
     req.loginuser=loginuser;

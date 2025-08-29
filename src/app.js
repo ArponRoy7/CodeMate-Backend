@@ -9,7 +9,7 @@ const requestRouter = require("./routers/requestRouter.js");
 const userRouter = require("./routers/userRouter.js");
 const limiter = require("./middleware/rateLimiter.js");
 const cors = require("cors");
-
+require('dotenv').config();
 // ---- CORS: permissive for local dev ----
 app.use(cors({
   origin: true,                         // mirror the request origin
@@ -40,8 +40,8 @@ app.get("/healthz", (req, res) => res.send("ok"));
 connectDB()
   .then(() => {
     console.log("MongoDB Connected...");
-    app.listen(3000, () => {
-      console.log("Server Running on port 3000");
+    app.listen(process.env.PORT, () => {
+      console.log("Server Running on port "+process.env.PORT);
     });
   })
   .catch((err) => {
