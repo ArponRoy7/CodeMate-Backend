@@ -3,15 +3,11 @@ const express = require("express");
 const stripeLib = require("stripe");
 const mongoose = require("mongoose");
 
-// Models
 const PlanConfig = require("../model/PlanConfig");
 const UserSubscription = require("../model/UserSubscription");
-const User = require("../model/user"); // <- your existing user model
+const User = require("../model/user");
 
-// Auth (you only showed adminAuth, we’ll use it for auth-protected endpoints)
 const { adminAuth } = require("../middleware/auth");
-
-const router = express.Router();
 
 if (!process.env.STRIPE_SECRET_KEY) {
   console.warn("[payments] Missing STRIPE_SECRET_KEY in .env");
@@ -21,15 +17,15 @@ if (!process.env.FRONTEND_URL) {
 }
 
 const stripe = stripeLib(process.env.STRIPE_SECRET_KEY);
+const router = express.Router();
 
 /* -----------------------------------------------------------------------------
  * Helpers
  * ---------------------------------------------------------------------------*/
 async function upsertFromCheckoutSession(session) {
-  // Metadata we attached at checkout creation
   const userId = session?.metadata?.userId;
-  const plan = session?.metadata?.plan;
-  const billing = session?.metadata?.billing;
+  const plan   = session?.metadata?.plan;
+  const billing= session?.metadata?.billing;
 
   if (!userId || !plan || !billing) return;
 
@@ -42,7 +38,7 @@ async function upsertFromCheckoutSession(session) {
     stripeSubscriptionId: session.subscription || undefined,
   };
 
-  // For subs, you can fetch the sub to get period end precisely
+  // precise period end for subscriptions
   if (session.subscription) {
     const sub = await stripe.subscriptions.retrieve(session.subscription);
     update.currentPeriodEnd = new Date(sub.current_period_end * 1000);
@@ -54,7 +50,6 @@ async function upsertFromCheckoutSession(session) {
     { upsert: true, new: true }
   );
 
-  // also mark user as premium (adds fields if not in schema yet)
   await User.updateOne(
     { _id: userId },
     { $set: { isPremium: true, premium: { plan, billing, status: "active" } } }
@@ -75,10 +70,6 @@ async function syncFromInvoice(invoice, succeeded) {
       currentPeriodEnd: new Date(sub.current_period_end * 1000),
     }
   );
-
-  // link back to user via subscription.customer
-  // retrieve the session or map customer->userId yourself if you stored it
-  const customerId = sub.customer;
 
   const existing = await UserSubscription.findOne({ stripeSubscriptionId: subId }).lean();
   if (existing?.userId) {
@@ -134,17 +125,36 @@ router.post("/stripe/checkout", adminAuth, async (req, res) => {
 });
 
 /* -----------------------------------------------------------------------------
- * 2) Stripe Webhook  (MUST be mounted with express.raw in app.js)
- *    POST /webhook/stripe
+ * 1b) OPTIONAL: Confirm after return (works even if webhook is delayed)
+ *     POST /stripe/confirm  { session_id }
  * ---------------------------------------------------------------------------*/
-router.post("/webhook/stripe", async (req, res) => {
-  // NOTE: req.body is a Buffer here — app.js must use express.raw for this route.
+router.post("/stripe/confirm", adminAuth, async (req, res) => {
+  try {
+    const { session_id } = req.body;
+    if (!session_id) return res.status(400).json({ message: "session_id is required" });
+
+    const session = await stripe.checkout.sessions.retrieve(session_id, { expand: ["subscription"] });
+    const paid = session.payment_status === "paid" || session.status === "complete";
+    if (!paid) return res.status(400).json({ message: "Session not paid/complete yet" });
+
+    await upsertFromCheckoutSession(session);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[/stripe/confirm] error:", err);
+    return res.status(500).json({ message: "Failed to confirm session" });
+  }
+});
+
+/* -----------------------------------------------------------------------------
+ * 2) Stripe Webhook  (mounted in app.js with express.raw)
+ * ---------------------------------------------------------------------------*/
+async function webhookHandler(req, res) {
   const sig = req.headers["stripe-signature"];
   let event;
 
   try {
     event = stripe.webhooks.constructEvent(
-      req.body,
+      req.body, // raw Buffer (express.raw in app.js)
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
@@ -171,17 +181,14 @@ router.post("/webhook/stripe", async (req, res) => {
         break;
       }
       default:
-        // ignore other events
+        // ignore others
         break;
     }
-
-    // Always ack 2xx fast so Stripe stops retrying
     return res.sendStatus(200);
   } catch (err) {
     console.error("❌ Webhook handler error:", err);
-    // non-2xx -> Stripe will retry
     return res.status(500).send("Webhook handler failure");
   }
-});
+}
 
-module.exports = router;
+module.exports = { router, webhookHandler };

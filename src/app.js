@@ -2,66 +2,50 @@
 require("dotenv").config();
 
 const express = require("express");
-const app = express();
-
 const cors = require("cors");
 const cookieparser = require("cookie-parser");
 
 const { connectDB } = require("./config/database.js");
 const limiter = require("./middleware/rateLimiter.js");
 
-// Existing routers
-const profileRouters = require("./routers/profilRouter.js");
-const authRouters    = require("./routers/authRouter.js");
-const requestRouter  = require("./routers/requestRouter.js");
-const userRouter     = require("./routers/userRouter.js");
+// Routers
+const profileRouters  = require("./routers/profilRouter.js");
+const authRouters     = require("./routers/authRouter.js");
+const requestRouter   = require("./routers/requestRouter.js");
+const userRouter      = require("./routers/userRouter.js");
+const premiumRouter   = require("./routers/premium.js");     // GET /plans
+const adminRouter     = require("./routers/admin.js");       // /admin/...
+const membershipRouter= require("./routers/membership.js");  // GET /me/subscription
 
-// Premium catalog & admin (you already had these)
-const premiumRouter  = require("./routers/premium.js");   // GET /plans
-const adminRouter    = require("./routers/admin.js");     // POST /admin/premium/plan (adminAuth inside)
+// Payments: router (checkout, confirm) + webhook handler fn
+const { router: paymentsRouter, webhookHandler } = require("./routers/payments.js");
 
-// Stripe payments + webhook (UPDATED router that contains /stripe/checkout AND /webhook/stripe)
-const paymentsRouter   = require("./routers/payments.js");
+const app = express();
 
-// NEW: membership status (GET /me/subscription)
-const membershipRouter = require("./routers/membership.js");
-
-// ---- CORS: permissive for local dev ----
+// ---- CORS ----
 app.use(
   cors({
     origin: true, // or set to process.env.FRONTEND_URL
     credentials: true,
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-Requested-With",
-      // demo headers (safe to keep; ignored if unused)
-      "x-demo-role",
-      "x-demo-email",
-      "x-demo-userid",
-    ],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     optionsSuccessStatus: 204,
   })
 );
 
 /**
- * 🔴 IMPORTANT: Stripe webhook must use RAW body for signature verification.
- * We mount ONLY the webhook path with express.raw BEFORE the global express.json().
- * The paymentsRouter includes: router.post("/webhook/stripe", handler)
- * Passing the router here works because an Express router is a middleware function.
+ * 🔴 Stripe webhook MUST be mounted with a RAW body parser BEFORE express.json().
+ * We mount a plain handler function here to avoid any double-path issues.
  */
 app.post(
   "/webhook/stripe",
-  express.raw({ type: "application/json" }), // raw buffer for Stripe signature
-  paymentsRouter                              // contains router.post("/webhook/stripe", ...)
+  express.raw({ type: "application/json" }),
+  webhookHandler
 );
 
 // ---- Core middleware (after webhook raw) ----
 app.use(express.json());
 app.use(cookieparser());
-
-// Rate limiter AFTER CORS/JSON (it already skips OPTIONS)
 app.use(limiter);
 
 // ---- Routes ----
@@ -70,22 +54,19 @@ app.use("/", profileRouters);
 app.use("/", requestRouter);
 app.use("/", userRouter);
 
-// Premium catalog (public), payments (checkout), membership (me/subscription)
-app.use("/", premiumRouter);      // e.g., GET /plans
-app.use("/", paymentsRouter);     // e.g., POST /stripe/checkout (webhook already handled above)
-app.use("/", membershipRouter);   // e.g., GET /me/subscription
+app.use("/", premiumRouter);      // GET /plans
+app.use("/", paymentsRouter);     // POST /stripe/checkout, POST /stripe/confirm
+app.use("/", membershipRouter);   // GET /me/subscription
+app.use("/admin", adminRouter);   // Admin plan management
 
-// Admin (plan management)
-app.use("/admin", adminRouter);   // e.g., POST /admin/premium/plan
-
-// Optional: health check
+// Health
 app.get("/healthz", (_req, res) => res.send("ok"));
 
 // ---- DB & start ----
 connectDB()
   .then(() => {
     console.log("MongoDB Connected...");
-    const port = process.env.PORT || 8080; // you said backend is 3000 locally; set PORT=3000 in .env if needed
+    const port = process.env.PORT || 3000; // set PORT in .env as you like
     app.listen(port, "0.0.0.0", () => {
       console.log("Server Running on port " + port);
     });
