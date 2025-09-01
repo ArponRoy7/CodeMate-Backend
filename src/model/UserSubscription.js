@@ -1,5 +1,6 @@
+// src/model/UserSubscription.js
 const mongoose = require("mongoose");
-const { PLAN_TYPES, BILLING_CYCLES } = require("../constants/plans");
+const { PLAN_TYPES, BILLING_CYCLES } = require("../utils/constants"); // <- FIXED PATH
 
 const UserSubscriptionSchema = new mongoose.Schema(
   {
@@ -17,5 +18,7 @@ const UserSubscriptionSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+UserSubscriptionSchema.index({ userId: 1 }, { unique: true });
 
 module.exports = mongoose.model("UserSubscription", UserSubscriptionSchema);
