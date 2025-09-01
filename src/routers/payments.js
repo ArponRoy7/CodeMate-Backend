@@ -6,7 +6,6 @@ const mongoose = require("mongoose");
 const PlanConfig = require("../model/PlanConfig");
 const UserSubscription = require("../model/UserSubscription");
 const User = require("../model/user");
-
 const { adminAuth } = require("../middleware/auth");
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -22,61 +21,168 @@ const router = express.Router();
 /* -----------------------------------------------------------------------------
  * Helpers
  * ---------------------------------------------------------------------------*/
-async function upsertFromCheckoutSession(session) {
-  const userId = session?.metadata?.userId;
-  const plan   = session?.metadata?.plan;
-  const billing= session?.metadata?.billing;
 
-  if (!userId || !plan || !billing) return;
-
-  const update = {
-    userId,
-    plan,
-    billing,
-    status: "active",
-    stripeCustomerId: session.customer || undefined,
-    stripeSubscriptionId: session.subscription || undefined,
-  };
-
-  // precise period end for subscriptions
-  if (session.subscription) {
-    const sub = await stripe.subscriptions.retrieve(session.subscription);
-    update.currentPeriodEnd = new Date(sub.current_period_end * 1000);
+// Small helper: safe ObjectId casting
+const asObjectId = (id) => {
+  try {
+    return new mongoose.Types.ObjectId(id);
+  } catch {
+    return null;
   }
+};
 
-  await UserSubscription.findOneAndUpdate(
-    { userId: new mongoose.Types.ObjectId(userId) },
-    update,
-    { upsert: true, new: true }
-  );
+// Derive plan & billing from invoice line -> price.id -> PlanConfig
+async function getPlanBillingFromInvoice(invoice) {
+  const line = invoice?.lines?.data?.[0];
+  const priceId = line?.price?.id || null;
+  if (!priceId) return {};
 
-  await User.updateOne(
-    { _id: userId },
-    { $set: { isPremium: true, premium: { plan, billing, status: "active" } } }
-  );
+  const cfg = await PlanConfig.findOne({ stripePriceId: priceId, active: true }).lean();
+  if (!cfg) return {};
+  return { plan: cfg.plan, billing: cfg.billing };
 }
 
-async function syncFromInvoice(invoice, succeeded) {
-  const subId = invoice.subscription;
-  if (!subId) return;
+// Try to resolve userId given invoice
+// 1) Existing UserSubscription by subscriptionId/customerId
+// 2) Map email from invoice/customer to User
+async function resolveUserIdFromInvoice(invoice) {
+  const subscriptionId = invoice?.subscription || null;
+  const customerId = invoice?.customer || null;
 
-  const sub = await stripe.subscriptions.retrieve(subId);
-  const status = succeeded ? "active" : "past_due";
+  // from existing subscription doc
+  if (subscriptionId || customerId) {
+    const existing = await UserSubscription.findOne({
+      $or: [
+        subscriptionId ? { stripeSubscriptionId: subscriptionId } : null,
+        customerId ? { stripeCustomerId: customerId } : null,
+      ].filter(Boolean),
+    }).lean();
+    if (existing?.userId) return existing.userId.toString();
+  }
 
-  await UserSubscription.findOneAndUpdate(
-    { stripeSubscriptionId: subId },
-    {
-      status,
-      currentPeriodEnd: new Date(sub.current_period_end * 1000),
+  // via email
+  let email = invoice?.customer_email || invoice?.receipt_email || null;
+  if (!email && customerId) {
+    try {
+      const cust = await stripe.customers.retrieve(customerId);
+      email = cust?.email || email;
+    } catch (_) {
+      /* ignore */
     }
-  );
+  }
+  if (email) {
+    const u = await User.findOne({ email }).select("_id").lean();
+    if (u?._id) return u._id.toString();
+  }
 
-  const existing = await UserSubscription.findOne({ stripeSubscriptionId: subId }).lean();
-  if (existing?.userId) {
-    await User.updateOne(
-      { _id: existing.userId },
-      { $set: { isPremium: succeeded, "premium.status": status } }
+  return null;
+}
+
+// Write via checkout.session.completed (requires metadata)
+// Never throws on missing metadata
+async function upsertFromCheckoutSession(session) {
+  try {
+    const userId = session?.metadata?.userId;
+    const plan = session?.metadata?.plan;
+    const billing = session?.metadata?.billing;
+
+    if (!userId || !plan || !billing) {
+      console.warn("[upsertFromCheckoutSession] Missing metadata for session", session?.id);
+      return; // skip gracefully; invoice path will upsert later
+    }
+
+    const update = {
+      userId,
+      plan,
+      billing,
+      status: "active",
+      stripeCustomerId: session.customer || undefined,
+      stripeSubscriptionId: session.subscription || undefined,
+    };
+
+    if (session.subscription) {
+      const sub = await stripe.subscriptions.retrieve(session.subscription);
+      update.currentPeriodEnd = new Date(sub.current_period_end * 1000);
+    }
+
+    await UserSubscription.findOneAndUpdate(
+      { userId: asObjectId(userId) },
+      update,
+      { upsert: true, new: true }
     );
+
+    await User.updateOne(
+      { _id: asObjectId(userId) },
+      { $set: { isPremium: true, premium: { plan, billing, status: "active" } } }
+    );
+  } catch (err) {
+    console.error("❌ upsertFromCheckoutSession error:", err);
+  }
+}
+
+// UPSERT from invoice.* even if checkout event failed
+async function upsertFromInvoice(invoice, succeeded) {
+  try {
+    const subscriptionId = invoice?.subscription || null;
+    const customerId = invoice?.customer || null;
+
+    // plan/billing from price
+    const { plan, billing } = await getPlanBillingFromInvoice(invoice);
+
+    // userId resolution
+    let userId = await resolveUserIdFromInvoice(invoice);
+
+    // fetch period end
+    let currentPeriodEnd = undefined;
+    if (subscriptionId) {
+      try {
+        const sub = await stripe.subscriptions.retrieve(subscriptionId);
+        currentPeriodEnd = new Date(sub.current_period_end * 1000);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+
+    const status = succeeded ? "active" : "past_due";
+
+    // Build an update doc (include fields we know)
+    const update = {
+      ...(userId ? { userId } : {}),
+      ...(plan ? { plan } : {}),
+      ...(billing ? { billing } : {}),
+      status,
+      stripeCustomerId: customerId || undefined,
+      stripeSubscriptionId: subscriptionId || undefined,
+      ...(currentPeriodEnd ? { currentPeriodEnd } : {}),
+    };
+
+    // Choose a stable upsert filter priority:
+    // 1) subscriptionId, 2) customerId, 3) userId (as final fallback)
+    const filter =
+      (subscriptionId && { stripeSubscriptionId: subscriptionId }) ||
+      (customerId && { stripeCustomerId: customerId }) ||
+      (userId && { userId: asObjectId(userId) }) || { stripeCustomerId: "unknown" };
+
+    const doc = await UserSubscription.findOneAndUpdate(
+      filter,
+      update,
+      { upsert: true, new: true }
+    );
+
+    // If we’ve created/updated without a userId but can find one now, attach it
+    if (!doc.userId && userId) {
+      await UserSubscription.updateOne({ _id: doc._id }, { $set: { userId: asObjectId(userId) } });
+    }
+
+    // Mark user premium if known
+    if (userId) {
+      await User.updateOne(
+        { _id: asObjectId(userId) },
+        { $set: { isPremium: succeeded, premium: { plan, billing, status } } }
+      );
+    }
+  } catch (err) {
+    console.error("❌ upsertFromInvoice error:", err);
   }
 }
 
@@ -133,7 +239,9 @@ router.post("/stripe/confirm", adminAuth, async (req, res) => {
     const { session_id } = req.body;
     if (!session_id) return res.status(400).json({ message: "session_id is required" });
 
-    const session = await stripe.checkout.sessions.retrieve(session_id, { expand: ["subscription"] });
+    const session = await stripe.checkout.sessions.retrieve(session_id, {
+      expand: ["subscription"],
+    });
     const paid = session.payment_status === "paid" || session.status === "complete";
     if (!paid) return res.status(400).json({ message: "Session not paid/complete yet" });
 
@@ -172,12 +280,12 @@ async function webhookHandler(req, res) {
       }
       case "invoice.payment_succeeded": {
         const invoice = event.data.object;
-        await syncFromInvoice(invoice, true);
+        await upsertFromInvoice(invoice, true);
         break;
       }
       case "invoice.payment_failed": {
         const invoice = event.data.object;
-        await syncFromInvoice(invoice, false);
+        await upsertFromInvoice(invoice, false);
         break;
       }
       default:
