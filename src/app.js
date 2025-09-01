@@ -4,28 +4,39 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const cookieparser = require("cookie-parser");
+const http = require("http");
 
 const { connectDB } = require("./config/database.js");
 const limiter = require("./middleware/rateLimiter.js");
 
 // Routers
-const profileRouters  = require("./routers/profilRouter.js");
-const authRouters     = require("./routers/authRouter.js");
-const requestRouter   = require("./routers/requestRouter.js");
-const userRouter      = require("./routers/userRouter.js");
-const premiumRouter   = require("./routers/premium.js");     // GET /plans
-const adminRouter     = require("./routers/admin.js");       // /admin/...
-const membershipRouter= require("./routers/membership.js");  // GET /me/subscription
+const profileRouters   = require("./routers/profilRouter.js");
+const authRouters      = require("./routers/authRouter.js");
+const requestRouter    = require("./routers/requestRouter.js");
+const userRouter       = require("./routers/userRouter.js");
+const premiumRouter    = require("./routers/premium.js");
+const adminRouter      = require("./routers/admin.js");
+const membershipRouter = require("./routers/membership.js");
+const chatRouter       = require("./routers/chat.js");
 
-// Payments: router (checkout, confirm) + webhook handler fn
 const { router: paymentsRouter, webhookHandler } = require("./routers/payments.js");
 
+// App + HTTP server (so Socket.IO can attach)
 const app = express();
+const server = http.createServer(app);
+
+// ---- Socket.IO ----
+const initializeSocket = require("./utils/socket.js");
+// initializeSocket returns the io instance (with presence helpers)
+const io = initializeSocket(server);
+// expose io to routes (e.g., /presence)
+app.set("io", io);
 
 // ---- CORS ----
+// If you have a specific frontend, set origin: process.env.FRONTEND_URL
 app.use(
   cors({
-    origin: true, // or set to process.env.FRONTEND_URL
+    origin: true, // or process.env.FRONTEND_URL
     credentials: true,
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
@@ -35,7 +46,6 @@ app.use(
 
 /**
  * 🔴 Stripe webhook MUST be mounted with a RAW body parser BEFORE express.json().
- * We mount a plain handler function here to avoid any double-path issues.
  */
 app.post(
   "/webhook/stripe",
@@ -54,10 +64,11 @@ app.use("/", profileRouters);
 app.use("/", requestRouter);
 app.use("/", userRouter);
 
-app.use("/", premiumRouter);      // GET /plans
-app.use("/", paymentsRouter);     // POST /stripe/checkout, POST /stripe/confirm
-app.use("/", membershipRouter);   // GET /me/subscription
-app.use("/admin", adminRouter);   // Admin plan management
+app.use("/", premiumRouter);
+app.use("/", paymentsRouter);
+app.use("/", membershipRouter);
+app.use("/", chatRouter);
+app.use("/admin", adminRouter);
 
 // Health
 app.get("/healthz", (_req, res) => res.send("ok"));
@@ -66,8 +77,8 @@ app.get("/healthz", (_req, res) => res.send("ok"));
 connectDB()
   .then(() => {
     console.log("MongoDB Connected...");
-    const port = process.env.PORT || 3000; // set PORT in .env as you like
-    app.listen(port, "0.0.0.0", () => {
+    const port = process.env.PORT || 3000;
+    server.listen(port, "0.0.0.0", () => {
       console.log("Server Running on port " + port);
     });
   })
