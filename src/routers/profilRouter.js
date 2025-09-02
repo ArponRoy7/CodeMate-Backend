@@ -35,7 +35,7 @@ profileRouter.get("/profile/view", adminAuth, async (req, res) => {
 
     // optional log as you had before
     //
-    if (fullName) console.log(fullName);
+    
 
     return res.status(200).json(payload);
   } catch (error) {
