@@ -1,136 +1,223 @@
-# 💼 DevTinder Backend
+## SkillMate Backend
 
-**DevTinder** is a full-stack developer collaboration platform — a backend project built using **Node.js**, **Express**, and **MongoDB**. This backend supports user authentication, profile management, developer discovery (feed), and connection requests, similar to a developer-focused Tinder app.
+A production-ready backend for a developer networking and collaboration platform — built with **Node.js**, **Express**, and **MongoDB**.  
+It powers authentication, profile management, discovery feed, connection requests, **real-time chat**, **subscriptions & premium plans**, **payments**, and **admin** controls.
+
+**Deployed here :**[**theskillmate.shop**](http://thecodemate.shop)
+## 🗂️ Project Structure
+
+```
+src/
+├── config/
+│   └── database.js
+├── middleware/
+│   ├── auth.js
+│   └── rateLimiter.js
+├── model/
+│   ├── chat.js
+│   ├── connectionRequest.js
+│   ├── PlanConfig.js
+│   ├── user.js
+│   └── UserSubscription.js
+├── routers/
+│   ├── admin.js
+│   ├── authRouter.js
+│   ├── chat.js
+│   ├── findRouter.js
+│   ├── membership.js
+│   ├── payments.js
+│   ├── premium.js
+│   ├── profilRouter.js
+│   ├── requestRouter.js
+│   └── userRouter.js
+├── utils/
+│   ├── constants.js
+│   ├── socket.js
+│   └── validations.js
+├── app.js
+└── api.md
+```
+
+---
+
+## ⚙️ Installation
+
+```bash
+git clone <repo-url>
+cd Skillmate-Backend
+
+# Install dependencies
+npm install
+
+# Setup environment variables
+cp .env.example .env
+
+# Run development server
+npm run dev    # if nodemon configured
+# or
+node app.js
+```
+
+### Environment Variables
+
+```
+PORT=8080
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=change_me
+JWT_EXPIRES_IN=7d
+COOKIE_NAME=skillmate_token
+
+
+
+# Payments (example: Stripe)
+STRIPE_SECRET=
+STRIPE_WEBHOOK_SECRET=
+```
 
 ---
 
 ## 🚀 Features
 
-- 🔐 **Authentication**
-  - Sign Up, Login, Logout (JWT + Cookies)
-  - Password hashing via `bcrypt`
-  - Secure token handling with HTTP-only cookies
+- 🔐 **Authentication & Security**
+  - Sign Up, Login, Logout (JWT in httpOnly cookies)
+  - Password hashing with `bcrypt`
+  - Change password flow
+  - Authentication middleware (`auth.js`)
 
-- 🧾 **Profile Management**
-  - View and edit profile
-  - Change password securely (with old password validation)
-  - Input validation using custom validators
+- 👤 **User Profiles**
+  - View and edit profile (skills, bio, socials)
+  - Public profile routes
+  - User validation (`validations.js`)
 
-- 🔎 **User Feed**
-  - Paginated feed of discoverable users
-  - Filters out already connected/requested users
-  - Customizable using query params
+- 🔎 **Discovery Feed**
+  - Paginated user feed
+  - Search developers by query/skills/location
+  - Excludes already connected/requested users
 
 - 💌 **Connection Requests**
-  - Send request (interested/ignored)
-  - Review request (accept/reject)
-  - Prevent duplicate or self-requests
+  - Send requests (interested/ignore)
+  - Accept/reject incoming requests
+  - Prevent duplicates & self-requests
 
-- 📬 **Request Management**
-  - View received connection requests
-  - View accepted connections
+- 💬 **Chat (Real-time)**
+  - Built with **Socket.IO** (`utils/socket.js`)
+  - Persistent messages (`model/chat.js`)
+  - One-to-one conversations
 
-- 🚫 **Rate Limiting**
-  - Global request rate limiting using `express-rate-limit`
-  - Prevents abuse, spam, and brute-force attacks
+- ⭐ **Premium & Membership**
+  - Plans defined in `PlanConfig.js`
+  - User subscriptions tracked in `UserSubscription.js`
+  - Premium-only feature checks
+  - Cancel or upgrade subscription
 
----
+- 💳 **Payments**
+  - Checkout session creation
+  - Webhook integration (e.g. Stripe)
+  - Payment history tracking
 
-## 🗂️ Project Structure
+- 🛡️ **Rate Limiting**
+  - `rateLimiter.js` middleware
+  - Protects from brute-force & abuse
 
-DevTinderBackend/
-│
-├── src/
-│ ├── config/ # DB connection config  
-│ │ └── database.js
-│ │
-│ ├── middleware/ # Middleware (Auth + Rate Limiting)
-│ │ ├── auth.js
-│ │ └── rateLimiter.js
-│ ├── model/ # Mongoose schemas
-│ │ ├── connectionRequest.js
-│ │ └── user.js
-│ │
-│ ├── routers/ # Express route modules
-│ │ ├── authRouter.js
-│ │ ├── findRouter.js
-│ │ ├── profilRouter.js
-│ │ ├── requestRouter.js
-│ │ └── userRouter.js
-│ │
-│ └── utils/ # Validation utilities
-│   ├── validations.js
-│   └── api.md # API documentation
-│
-├── app.js # Main entry point
-├── package.json
-├── package-lock.json
-└── .gitignore
+- ⚙️ **Admin**
+  - Manage users (block/unblock)
+  - Manage available plans
+  - Audit endpoints
 
 ---
 
-## 🧪 APIs Overview
+## 📚 API Overview
 
-| Route Group  | Method | Endpoint                             | Description                   |
-| ------------ | ------ | ------------------------------------ | ----------------------------- |
-| **auth**     | POST   | `/signup`                            | Create a new user             |
-|              | POST   | `/login`                             | Log in and receive JWT token  |
-|              | GET    | `/logout`                            | Clear auth cookie             |
-| **profile**  | GET    | `/profile/view`                      | View logged-in user's profile |
-|              | PATCH  | `/profile/update`                    | Edit user details             |
-|              | PATCH  | `/profile/password`                  | Change password               |
-| **requests** | POST   | `/request/send/:status/:userId`      | Send connection request       |
-|              | POST   | `/request/review/:status/:requestId` | Accept/Reject request         |
-| **user**     | GET    | `/user/requests/received`            | View incoming requests        |
-|              | GET    | `/user/connections`                  | View accepted connections     |
-|              | GET    | `/feed?page=x&limit=y&search=keyword`| Paginated user discovery feed |
+### Auth (`authRouter.js`)
+| Method | Endpoint              | Description                               |
+|-------:|-----------------------|-------------------------------------------|
+| POST   | `/auth/signup`        | Register new user                         |
+| POST   | `/auth/login`         | Login & set JWT cookie                    |
+| GET    | `/auth/logout`        | Logout & clear cookie                     |
+| PATCH  | `/auth/password`      | Change password                           |
 
----
+### Users & Profile (`userRouter.js`, `profilRouter.js`)
+| Method | Endpoint             | Description                  |
+|-------:|----------------------|------------------------------|
+| GET    | `/user/me`           | Get logged-in user           |
+| PATCH  | `/user/me`           | Update profile fields        |
+| GET    | `/profile/:userId`   | Get public profile by ID     |
 
-## 🛠️ Tech Stack
+### Discovery (`findRouter.js`)
+| Method | Endpoint                       | Description                  |
+|-------:|--------------------------------|------------------------------|
+| GET    | `/find`                        | Paginated discovery feed     |
+| GET    | `/find/search?q=js&skills=js`  | Search by skills/keywords    |
 
-| Layer            | Technology                       |
-| ---------------- | -------------------------------- |
-| Runtime          | Node.js                          |
-| Framework        | Express.js                       |
-| Database         | MongoDB (with Mongoose ODM)      |
-| Authentication   | JWT + Cookies                    |
-| Security         | bcrypt password hashing          |
-| Validation       | validator.js                     |
-| Pagination       | MongoDB `.skip()` and `.limit()` |
-| Rate Limiting    | express-rate-limit               |
-| Deployment Ready | Yes (Can be Dockerized)          |
+### Connection Requests (`requestRouter.js`)
+| Method | Endpoint                                       | Description                  |
+|-------:|------------------------------------------------|------------------------------|
+| POST   | `/request/send/:status/:userId`                | Send connection request      |
+| POST   | `/request/review/:status/:requestId`           | Accept/Reject a request      |
+| GET    | `/request/incoming`                            | View incoming requests       |
+| GET    | `/request/connections`                         | View accepted connections    |
+
+### Chat (`chat.js`)
+| Method | Endpoint               | Description                  |
+|-------:|------------------------|------------------------------|
+| GET    | `/chat/threads`        | List chat threads            |
+| GET    | `/chat/:targetUserId`  | Fetch messages               |
+| POST   | `/chat/:targetUserId`  | Send a message               |
+| WS     | `Socket.IO /ws`        | Real-time messaging channel  |
+
+### Plans & Premium (`premium.js`, `membership.js`)
+| Method | Endpoint                 | Description                       |
+|-------:|--------------------------|-----------------------------------|
+| GET    | `/plans`                 | List all plans                    |
+| GET    | `/subscription`          | Get current subscription          |
+| POST   | `/subscription/cancel`   | Cancel subscription               |
+| POST   | `/premium/feature-check` | Check premium feature entitlement |
+
+### Payments (`payments.js`)
+| Method | Endpoint                | Description                        |
+|-------:|-------------------------|------------------------------------|
+| POST   | `/payments/checkout`    | Create checkout session            |
+| POST   | `/payments/webhook`     | Handle payment provider webhook    |
+| GET    | `/payments/history`     | Get payment history                |
+
+### Admin (`admin.js`)
+| Method | Endpoint                | Description                        |
+|-------:|-------------------------|------------------------------------|
+| GET    | `/admin/users`          | List/search all users              |
+| PATCH  | `/admin/users/:id/block`| Block or unblock user              |
+| POST   | `/admin/plans`          | Create or update subscription plan |
 
 ---
 
 ## 🔒 Security Practices
 
-- Passwords hashed using `bcrypt`
-- JWT stored in `httpOnly` cookies to prevent XSS
-- Global rate limiting applied using `express-rate-limit`
-- Route-level JWT authentication middleware (`adminAuth`)
-- Input validation using custom utilities
-- Prevents self-connection in `connectionRequestSchema`
+- Passwords hashed with **bcrypt**
+- JWT stored in **httpOnly cookies**
+- Middleware-based auth & rate limiting
+- Input validation in `utils/validations.js`
+- Prevents duplicate/self-connections
 
 ---
 
-## 📦 Installation
+## ▶️ Scripts
 
-```bash
-# Clone repo
-git clone https://github.com/arpon7/DevTinderBackend.git
-cd DevTinderBackend
-
-# Install dependencies
-npm install
-
-# Set environment variables (if applicable)
-# e.g., MONGODB_URL, JWT_SECRET
-
-# Run server
-node app.js
-
-Author
-Arpon Roy
-GitHub
+```json
+"scripts": {
+  "start": "node app.js",
+  "dev": "nodemon app.js",
+  "lint": "eslint .",
+  "test": "node --test"
+}
 ```
+
+---
+
+## 📄 License
+
+MIT 
+
+---
+
+## 👤 Author
+
+**Arpon Roy** 
